@@ -1,0 +1,27 @@
+# The virtual environment: thousands of files, rebuilt with:
+#   python -m venv .venv
+#   .\.venv\Scripts\pip install -r requirements.txt
+.venv/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Flet build leftovers (Stage 6 will create these)
+.flet/
+build/
+dist/
+
+# Machine-specific state, created by the app itself at runtime:
+# the words last downloaded from this PC, and its address.
+local_words.json
+pc_address.txt
+
+# Local study material: kept on this machine, deliberately not in the repo.
+# The stage notes explain the code file by file, and specs/ holds the written
+# handoff for the work in progress. Both are for us, not for the repository.
+notes/
+specs/
+
+# Editor noise (but .vscode/launch.json stays: it is how F5 runs the app)
+.vscode/settings.json
