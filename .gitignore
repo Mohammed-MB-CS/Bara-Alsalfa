@@ -18,10 +18,12 @@ local_words.json
 pc_address.txt
 
 # Local study material: kept on this machine, deliberately not in the repo.
-# The stage notes explain the code file by file, and specs/ holds the written
-# handoff for the work in progress. Both are for us, not for the repository.
+# The stage notes explain the code file by file, specs/ holds the written
+# handoff for the work in progress, and .scratch/ holds the issues and their
+# triage state. All three are for us, not for the repository.
 notes/
 specs/
+.scratch/
 
 # Editor noise (but .vscode/launch.json stays: it is how F5 runs the app)
 .vscode/settings.json
