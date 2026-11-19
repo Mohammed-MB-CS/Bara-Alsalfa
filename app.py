@@ -17,6 +17,23 @@ WORDS_FILE = HERE / "local_words.json"  # the copy the phone keeps
 ADDRESS_FILE = HERE / "pc_address.txt"  # last PC address the user typed
 
 
+# ---------------------------------------------------------------- style
+# "سوق الليل": one dark ground, one panel, and one accent per phase of the
+# game. The colour tells you where you are before you read a word.
+INK = "#0B1B22"  # the ground, on every screen
+PANEL = "#12313B"  # fields, cards, the word
+TEXT = "#F2EBDD"  # body text: warm off-white, easier at night than pure white
+MUTED = "#86A2A8"  # captions: "يسأل:", "1 من 4"
+CORAL = "#FF7059"  # play: the button that starts or advances something
+SAFFRON = "#F4B740"  # talk: the round screen
+MINT = "#7FD8BE"  # the word you were dealt
+SPY = "#C1334D"  # you are out of the loop
+ON_CORAL = "#23120E"  # text on coral
+ON_SAFFRON = "#231C08"  # text on saffron
+ON_SPY = "#F6E9E4"  # text on the spy card
+EDGE = "#1D4A57"  # hairlines: borders and dividers
+
+
 # ---------------------------------------------------------------- files
 
 
@@ -80,12 +97,56 @@ def main(page: ft.Page):
         "Tajawal Bold": "/fonts/Tajawal-Bold.ttf",
     }
 
-    theme = ft.Theme(font_family="Tajawal", color_scheme_seed=ft.Colors.PURPLE)
+    theme = ft.Theme(font_family="Tajawal")
 
     # Both themes, because the app is dark: with theme_mode DARK, Flet uses
     # dark_theme, and a font set only on theme would be ignored.
     page.theme = theme
     page.dark_theme = theme
+    page.bgcolor = INK
+
+    # One shape for every button and field, so the screens feel like one app.
+    radius = ft.RoundedRectangleBorder(radius=14)
+
+    def action(label, on_click, color=CORAL, on_color=ON_CORAL, width=300, height=56):
+        return ft.FilledButton(
+            label,
+            on_click=on_click,
+            width=width,
+            height=height,
+            bgcolor=color,
+            color=on_color,
+            elevation=0,
+            style=ft.ButtonStyle(
+                shape=radius,
+                text_style=ft.TextStyle(size=16, font_family="Tajawal Bold"),
+            ),
+        )
+
+    def quiet(label, on_click, color=MUTED):
+        return ft.TextButton(
+            label,
+            on_click=on_click,
+            style=ft.ButtonStyle(
+                color=color,
+                shape=radius,
+                text_style=ft.TextStyle(size=14, font_family="Tajawal"),
+            ),
+        )
+
+    # One size for the name of a screen, so every screen starts the same way.
+    def title(text, color=TEXT):
+        return ft.Text(text, size=30, font_family="Tajawal Bold", color=color)
+
+    # A field's name sits above it, flush to the same edge as the field.
+    def caption(text, width=300):
+        return ft.Text(
+            text,
+            size=13,
+            color=MUTED,
+            width=width,
+            text_align=ft.TextAlign.RIGHT,
+        )
 
     haptics = ft.HapticFeedback()
 
@@ -139,46 +200,36 @@ def main(page: ft.Page):
         # so the buttons above it never move
         status = ft.Text(
             f"عدد الفئات: {count}" if count else "لا توجد كلمات بعد",
-            color=ft.Colors.GREY,
+            color=MUTED,
+            size=13,
         )
 
         def refresh(e):
             address = load_address()
             if not address:
                 status.value = "أدخل عنوان الحاسب من الإعدادات"
-                status.color = ft.Colors.AMBER
+                status.color = SAFFRON
                 page.update()
                 return
 
             status.value = "جاري التحديث..."
-            status.color = ft.Colors.GREY
+            status.color = MUTED
             page.update()
 
             ok, message = sync_words(address)
             status.value = message
-            status.color = ft.Colors.GREEN if ok else ft.Colors.RED
+            status.color = MINT if ok else CORAL
             page.update()
 
         show(
-            ft.Text("برا السالفة", size=44, font_family="Tajawal Bold"),
-            ft.Text("لعبة الجاسوس", size=16, color=ft.Colors.GREY),
-            ft.Container(height=30),
-            ft.FilledButton(
-                "لعبة جديدة",
-                icon=ft.Icons.PLAY_ARROW,
-                height=60,
-                width=280,
-                on_click=lambda e: setup(),
-            ),
-            ft.OutlinedButton(
-                "تحديث الكلمات",
-                icon=ft.Icons.SYNC,
-                width=280,
-                on_click=refresh,
-            ),
-            ft.Container(height=16),
-            ft.Container(height=24, alignment=ft.Alignment.CENTER, content=status),
-            ft.TextButton("الإعدادات", on_click=lambda e: settings()),
+            ft.Text("برا السالفة", size=40, font_family="Tajawal Bold", color=TEXT),
+            ft.Text("لعبة الجاسوس", size=14, color=MUTED),
+            ft.Container(height=36),
+            action("لعبة جديدة", lambda e: setup()),
+            quiet("تحديث الكلمات", refresh, color=MINT),
+            quiet("الإعدادات", lambda e: settings()),
+            ft.Container(height=14),
+            ft.Container(alignment=ft.Alignment.CENTER, content=status),
             center=True,
         )
 
@@ -188,27 +239,46 @@ def main(page: ft.Page):
         data = load_words()
         if not data:
             show(
-                ft.Text("لا توجد كلمات محفوظة."),
-                ft.Text("شغّل برنامج الحاسب ثم اضغط تحديث الكلمات.", color=ft.Colors.GREY),
-                ft.FilledButton("تحديث الكلمات", on_click=lambda e: settings()),
+                title("لا توجد كلمات محفوظة"),
+                ft.Text("شغّل برنامج الحاسب ثم اضغط تحديث الكلمات", color=MUTED, size=14),
+                ft.Container(height=10),
+                action("تحديث الكلمات", lambda e: settings()),
                 center=True,
             )
             return
 
+        # Fields carry their name in a caption above them, not as Material's
+        # floating label: that label straddles the border and looks broken once
+        # the field has a hairline, and it collides with small widths.
+        field = dict(
+            filled=True,
+            fill_color=PANEL,
+            border_color=EDGE,
+            border_width=1,
+            focused_border_color=MINT,
+            border_radius=14,
+            text_size=17,
+            color=TEXT,
+            hint_style=ft.TextStyle(color=MUTED, size=14),
+        )
+
         names = ft.TextField(
-            label="أسماء اللاعبين (اسم في كل سطر)",
+            hint_text="اسم في كل سطر",
             multiline=True,
             min_lines=4,
+            width=300,
             value=S["names"],
-            text_size=18,
+            cursor_color=MINT,
+            **field,
         )
         category = ft.Dropdown(
-            label="الفئة",
             value="عشوائي",
+            width=300,
             options=[ft.DropdownOption(key="عشوائي", text="عشوائي")]
             + [ft.DropdownOption(key=c["name"], text=c["name"]) for c in data["categories"]],
+            **field,
         )
-        error = ft.Text("", color=ft.Colors.RED)
+        error = ft.Text("", color=CORAL, size=13)
 
         def start(e):
             players = [line.strip() for line in names.value.splitlines() if line.strip()]
@@ -236,12 +306,17 @@ def main(page: ft.Page):
             reveal()
 
         show(
-            ft.Text("لاعبون", size=30, font_family="Tajawal Bold"),
+            ft.Container(height=16),
+            title("لاعبون"),
+            ft.Container(height=14),
+            caption("أسماء اللاعبين"),
             names,
+            ft.Container(height=10),
+            caption("الفئة"),
             category,
-            ft.Container(height=28, alignment=ft.Alignment.CENTER, content=error),
-            ft.FilledButton("ابدأ", height=55, width=240, on_click=start),
-            ft.TextButton("رجوع", on_click=lambda e: home()),
+            ft.Container(height=22, alignment=ft.Alignment.CENTER, content=error),
+            action("ابدأ", start),
+            quiet("رجوع", lambda e: home()),
         )
 
     # ------------------------------------------------------------ reveal
@@ -265,12 +340,16 @@ def main(page: ft.Page):
                 alignment=ft.Alignment.CENTER,
                 content=ft.Column(
                     [
-                        ft.Text("أعطِ الجوال إلى", color=ft.Colors.GREY),
-                        ft.Text(name, size=34, font_family="Tajawal Bold"),
+                        ft.Text("أعطِ الجوال إلى", color=MUTED, size=13),
+                        ft.Text(name, size=36, font_family="Tajawal Bold", color=TEXT),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=8,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=6,
                 ),
+                bgcolor=PANEL,
+                border=ft.Border.all(1, EDGE),
+                border_radius=18,
             )
 
         def face_up():
@@ -278,18 +357,16 @@ def main(page: ft.Page):
                 width=320,
                 height=220,
                 alignment=ft.Alignment.CENTER,
-                content=ft.Container(
-                    content=ft.Text(
-                        "أنت برا السالفة" if is_spy else g.word,
-                        size=40,
-                        font_family="Tajawal Bold",
-                        text_align=ft.TextAlign.CENTER,
-                        color=ft.Colors.RED if is_spy else ft.Colors.WHITE,
-                    ),
-                    padding=40,
-                    border=ft.Border.all(2, ft.Colors.PURPLE),
-                    border_radius=20,
+                content=ft.Text(
+                    "أنت برا\nالسالفة" if is_spy else g.word,
+                    size=40 if is_spy else 46,
+                    font_family="Tajawal Bold",
+                    text_align=ft.TextAlign.CENTER,
+                    color=ON_SPY if is_spy else MINT,
                 ),
+                bgcolor=SPY if is_spy else PANEL,
+                border=None if is_spy else ft.Border.all(1.5, MINT),
+                border_radius=18,
             )
 
         card = ft.AnimatedSwitcher(
@@ -300,11 +377,11 @@ def main(page: ft.Page):
             transition=ft.AnimatedSwitcherTransition.SCALE,
             switch_in_curve=ft.AnimationCurve.EASE_OUT,
         )
-        button = ft.FilledButton(
+        button = action(
             "إخفاء وتمرير" if S["shown"] else "اضغط لعرض الكلمة",
-            height=80,
+            lambda e: tap(),
             width=320,
-            on_click=lambda e: tap(),
+            height=64,
         )
 
         def tap():
@@ -323,13 +400,14 @@ def main(page: ft.Page):
 
         show(
             card,
+            ft.Container(height=8),
             button,
             ft.Container(height=12),
             ft.Container(
                 height=24,
                 alignment=ft.Alignment.CENTER,
                 content=ft.Text(
-                    f"{S['i'] + 1} من {len(g.players)}", color=ft.Colors.GREY
+                    f"{S['i'] + 1} من {len(g.players)}", color=MUTED, size=13
                 ),
             ),
             center=True,
@@ -345,23 +423,23 @@ def main(page: ft.Page):
         asker, answerer = g.last_pair
 
         show(
-            ft.Text(asker, size=44, font_family="Tajawal Bold"),
-            ft.Text(f"يسأل: {answerer}", size=20, color=ft.Colors.GREY),
-            ft.Container(height=8),
-            ft.Text("الإجابة بنعم أو لا فقط", color=ft.Colors.GREY),
+            ft.Text(f"يسأل: {asker}", size=15, color=MUTED),
+            ft.Text(answerer, size=44, font_family="Tajawal Bold", color=TEXT),
+            ft.Container(height=4),
+            ft.Text("أجب بنعم أو لا", size=15, color=MUTED),
             ft.Container(height=30),
-            ft.FilledButton(
-                "الجولة التالية",
-                height=55,
-                width=300,
-                on_click=lambda e: next_round(),
-            ),
+            action("الجولة التالية", lambda e: next_round(), color=SAFFRON, on_color=ON_SAFFRON),
             ft.OutlinedButton(
                 "نريد التصويت",
                 icon=ft.Icons.HOW_TO_VOTE,
-                height=55,
+                height=56,
                 width=300,
                 on_click=lambda e: ask_vote(),
+                style=ft.ButtonStyle(
+                    color=SAFFRON,
+                    side=ft.BorderSide(1, EDGE),
+                    shape=radius,
+                ),
             ),
             ft.Container(height=8),
             ft.Container(
@@ -369,19 +447,20 @@ def main(page: ft.Page):
                 alignment=ft.Alignment.CENTER,
                 content=ft.Text(
                     f"طلبات التصويت: {g.vote_requests} من {g.votes_needed()}",
-                    color=ft.Colors.GREY,
+                    color=MUTED,
+                    size=13,
                 ),
             ),
             ft.Container(
                 height=22,
                 alignment=ft.Alignment.CENTER,
                 content=ft.Text(
-                    "" if g.everyone_played() else "ينتظر: لم يلعب الجميع بعد",
+                    "" if g.everyone_played() else "التصويت يفتح بعد أن يلعب الجميع",
                     size=13,
-                    color=ft.Colors.AMBER,
+                    color=SAFFRON,
                 ),
             ),
-            ft.TextButton("إلغاء اللعبة", on_click=lambda e: home()),
+            quiet("إلغاء اللعبة", lambda e: home()),
             center=True,
         )
 
@@ -422,23 +501,32 @@ def main(page: ft.Page):
             vote_screen()
 
         show(
-            ft.Text("التصويت", size=30, font_family="Tajawal Bold"),
-            ft.Text("أعطِ الجوال إلى", color=ft.Colors.GREY),
-            ft.Text(voter, size=30, font_family="Tajawal Bold"),
-            ft.Text("من تظنه برا السالفة؟", color=ft.Colors.GREY),
-            ft.Container(height=10),
+            title("التصويت", CORAL),
+            ft.Container(height=6),
+            ft.Text("أعطِ الجوال إلى", color=MUTED, size=14),
+            ft.Text(voter, size=34, font_family="Tajawal Bold", color=TEXT),
+            ft.Text("من تظنه برا السالفة؟", color=MUTED, size=15),
+            ft.Container(height=16),
             *[
                 ft.FilledButton(
                     name,
-                    width=260,
-                    height=50,
+                    width=300,
+                    height=56,
                     on_click=lambda e, n=name: pick(n),
+                    bgcolor=PANEL,
+                    color=TEXT,
+                    elevation=0,
+                    style=ft.ButtonStyle(
+                        shape=radius,
+                        side=ft.BorderSide(1, EDGE),
+                        text_style=ft.TextStyle(size=17, font_family="Tajawal Bold"),
+                    ),
                 )
                 for name in g.players
                 if name != voter
             ],
-            ft.Container(height=10),
-            ft.Text(f"{S['i'] + 1} من {len(g.players)}", color=ft.Colors.GREY),
+            ft.Container(height=12),
+            ft.Text(f"{S['i'] + 1} من {len(g.players)}", color=MUTED, size=13),
             center=True,
         )
 
@@ -460,22 +548,51 @@ def main(page: ft.Page):
                     ft.FilledButton(
                         word,
                         width=300,
-                        height=48,
+                        height=52,
                         on_click=lambda e, w=word: confirm(w),
+                        bgcolor=PANEL,
+                        color=TEXT,
+                        elevation=0,
+                        style=ft.ButtonStyle(
+                            shape=radius,
+                            side=ft.BorderSide(1, EDGE),
+                            text_style=ft.TextStyle(size=17, font_family="Tajawal Bold"),
+                        ),
                     )
                     for word in S["words"]
                 ]
                 + [
                     ft.Container(height=6),
-                    ft.TextButton("لم يعرف", on_click=lambda e: confirm(None)),
+                    quiet("لم يعرف", lambda e: confirm(None)),
                 ],
             )
 
             show(
-                ft.Text("انتهى التصويت", size=26, font_family="Tajawal Bold"),
-                ft.Text(f"برا السالفة: {g.spy}", size=30, color=ft.Colors.PURPLE_200),
+                ft.Text("انتهى التصويت", size=14, color=MUTED),
                 ft.Container(height=10),
-                ft.Text("سلّم الجوال إلى الجاسوس واختر الكلمة", color=ft.Colors.AMBER),
+                # the same red as the spy's card, so "you are out" looks the
+                # same wherever it appears
+                ft.Container(
+                    padding=ft.Padding.symmetric(horizontal=28, vertical=12),
+                    bgcolor=SPY,
+                    border_radius=18,
+                    content=ft.Column(
+                        [
+                            ft.Text("برا السالفة", size=13, color=ON_SPY),
+                            ft.Text(
+                                g.spy,
+                                size=32,
+                                font_family="Tajawal Bold",
+                                color=ON_SPY,
+                            ),
+                        ],
+                        spacing=0,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                ),
+                ft.Container(height=16),
+                ft.Text("سلّم الجوال إلى الجاسوس واختر الكلمة", color=SAFFRON, size=14),
+                ft.Container(height=8),
                 picks,
                 center=True,
             )
@@ -484,73 +601,133 @@ def main(page: ft.Page):
             board = sorted(g.scores.items(), key=lambda item: item[1], reverse=True)
 
             show(
-                ft.Text(f"الكلمة كانت: {summary['word']}", size=24),
+                ft.Row(
+                    [
+                        ft.Text("الكلمة كانت:", size=15, color=MUTED),
+                        ft.Text(
+                            summary["word"],
+                            size=28,
+                            font_family="Tajawal Bold",
+                            color=MINT,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=8,
+                ),
                 ft.Text(
                     "عرفها الجاسوس! +2" if summary["spy_guessed"] else "الجاسوس لم يعرفها",
-                    color=ft.Colors.AMBER if summary["spy_guessed"] else ft.Colors.GREY,
+                    color=MINT if summary["spy_guessed"] else MUTED,
+                    size=14,
                 ),
-                ft.Divider(),
-                ft.Text("النقاط", size=22, font_family="Tajawal Bold"),
-                *[ft.Text(f"{name} — {points}", size=20) for name, points in board],
-                ft.Container(height=20),
-                ft.FilledButton(
-                    "العب مرة أخرى",
-                    height=55,
-                    width=280,
-                    on_click=lambda e: setup(),
-                ),
-                ft.TextButton("الرئيسية", on_click=lambda e: home()),
+                ft.Container(height=14),
+                ft.Container(width=300, height=1, bgcolor=EDGE),
+                ft.Container(height=14),
+                ft.Text("النقاط", size=16, color=MUTED),
+                *[
+                    ft.Text(f"{name} — {points}", size=19, color=TEXT)
+                    for name, points in board
+                ],
+                ft.Container(height=24),
+                action("العب مرة أخرى", lambda e: setup()),
+                quiet("الرئيسية", lambda e: home()),
                 center=True,
             )
 
     # ------------------------------------------------------------ settings
 
     def settings():
-        status = ft.Text("", color=ft.Colors.GREY)
-        cats = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
+        status = ft.Text("", color=MUTED, size=13)
+        cats = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO, expand=True)
         address = ft.TextField(
-            label="عنوان الحاسب",
             hint_text="192.168.1.5:8000",
             value=load_address(),
-            text_size=18,
             expand=True,
+            text_size=16,
+            filled=True,
+            fill_color=PANEL,
+            border_color=EDGE,
+            border_width=1,
+            focused_border_color=MINT,
+            border_radius=14,
+            color=TEXT,
+            hint_style=ft.TextStyle(color=MUTED, size=14),
+            cursor_color=MINT,
         )
 
         def draw():
             cats.controls.clear()
             data = load_words()
             if not data:
-                cats.controls.append(ft.Text("لا توجد كلمات محفوظة"))
+                cats.controls.append(ft.Text("لا توجد كلمات محفوظة", color=MUTED, size=14))
                 return
             for cat in data["categories"]:
+                n = len(cat["words"])
+                # Arabic counts change the word: 3-10 takes the plural
+                if n == 1:
+                    count = "كلمة واحدة"
+                elif n == 2:
+                    count = "كلمتان"
+                elif 3 <= n <= 10:
+                    count = f"{n} كلمات"
+                else:
+                    count = f"{n} كلمة"
                 cats.controls.append(
-                    ft.Text(f"{cat['name']} — {len(cat['words'])} كلمة", size=18)
+                    ft.Text(
+                        f"{cat['name']} — {count}",
+                        size=15,
+                        color=TEXT,
+                    )
                 )
 
         def sync(e):
             status.value = "جاري المزامنة..."
-            status.color = ft.Colors.GREY
+            status.color = MUTED
             page.update()
 
             ok, message = sync_words(address.value)
             status.value = message
-            status.color = ft.Colors.GREEN if ok else ft.Colors.RED
+            status.color = MINT if ok else CORAL
             draw()
             page.update()
 
         draw()
         show(
-            ft.Text("الإعدادات", size=30, font_family="Tajawal Bold"),
+            title("الإعدادات"),
+            ft.Container(height=6),
             ft.Text(
                 "اكتب عنوان الحاسب الذي يطبعه برنامج server.py",
-                size=14,
-                color=ft.Colors.GREY,
+                size=13,
+                color=MUTED,
+                text_align=ft.TextAlign.CENTER,
             ),
-            ft.Row([address, ft.FilledButton("مزامنة", icon=ft.Icons.SYNC, on_click=sync)]),
-            ft.Container(height=24, alignment=ft.Alignment.CENTER, content=status),
-            ft.Divider(),
+            ft.Container(height=18),
+            caption("عنوان الحاسب", width=340),
+            ft.Row(
+                [
+                    address,
+                    ft.FilledButton(
+                        "مزامنة",
+                        icon=ft.Icons.SYNC,
+                        on_click=sync,
+                        height=56,
+                        bgcolor=PANEL,
+                        color=MINT,
+                        elevation=0,
+                        style=ft.ButtonStyle(
+                            shape=radius,
+                            side=ft.BorderSide(1, EDGE),
+                            text_style=ft.TextStyle(size=14, font_family="Tajawal"),
+                        ),
+                    ),
+                ],
+                width=340,
+                spacing=10,
+            ),
+            ft.Container(height=16, alignment=ft.Alignment.CENTER, content=status),
+            ft.Container(width=340, height=1, bgcolor=EDGE),
+            ft.Container(height=10),
             cats,
-            ft.TextButton("رجوع", on_click=lambda e: home()),
+            quiet("رجوع", lambda e: home()),
         )
 
     home()
