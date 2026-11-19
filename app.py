@@ -1,6 +1,7 @@
 """برا السالفة — the app.
 
-Stage 4: all the screens. Run with:  python app.py
+Stage 5: the screens, the Arabic font, the reveal animation, vibration.
+Run with:  python app.py
 """
 
 import json
@@ -70,8 +71,28 @@ def main(page: ft.Page):
     page.title = "برا السالفة"
     page.rtl = True
     page.theme_mode = ft.ThemeMode.DARK
-    page.theme = ft.Theme(color_scheme_seed=ft.Colors.PURPLE)
     page.padding = 20
+
+    # The font ships inside the app, in assets/fonts/. Tajawal because it is a
+    # static font: Flet cannot load variable fonts yet.
+    page.fonts = {
+        "Tajawal": "/fonts/Tajawal-Regular.ttf",
+        "Tajawal Bold": "/fonts/Tajawal-Bold.ttf",
+    }
+
+    theme = ft.Theme(font_family="Tajawal", color_scheme_seed=ft.Colors.PURPLE)
+
+    # Both themes, because the app is dark: with theme_mode DARK, Flet uses
+    # dark_theme, and a font set only on theme would be ignored.
+    page.theme = theme
+    page.dark_theme = theme
+
+    haptics = ft.HapticFeedback()
+
+    def buzz():
+        """One short vibration. Phones only: a desktop has nothing to shake."""
+        if page.platform in (ft.PagePlatform.ANDROID, ft.PagePlatform.IOS):
+            page.run_task(haptics.vibrate)
 
     # everything the screens share
     S = {
@@ -139,7 +160,7 @@ def main(page: ft.Page):
             page.update()
 
         show(
-            ft.Text("برا السالفة", size=44, weight=ft.FontWeight.BOLD),
+            ft.Text("برا السالفة", size=44, font_family="Tajawal Bold"),
             ft.Text("لعبة الجاسوس", size=16, color=ft.Colors.GREY),
             ft.Container(height=30),
             ft.FilledButton(
@@ -215,7 +236,7 @@ def main(page: ft.Page):
             reveal()
 
         show(
-            ft.Text("لاعبون", size=30, weight=ft.FontWeight.BOLD),
+            ft.Text("لاعبون", size=30, font_family="Tajawal Bold"),
             names,
             category,
             ft.Container(height=28, alignment=ft.Alignment.CENTER, content=error),
@@ -234,32 +255,34 @@ def main(page: ft.Page):
         name = g.players[S["i"]]
         is_spy = name == g.spy
 
-        # Both states share one fixed-height box, so the button below it
-        # sits in the same place before and after the tap.
-        if not S["shown"]:
-            card = ft.Container(
+        # Two faces of one card, same size, swapped inside an AnimatedSwitcher:
+        # the word appears with a small pop, and the button under the card
+        # never moves because the slot keeps its size.
+        def face_down():
+            return ft.Container(
+                width=320,
                 height=220,
                 alignment=ft.Alignment.CENTER,
                 content=ft.Column(
                     [
                         ft.Text("أعطِ الجوال إلى", color=ft.Colors.GREY),
-                        ft.Text(name, size=34, weight=ft.FontWeight.BOLD),
+                        ft.Text(name, size=34, font_family="Tajawal Bold"),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=8,
                 ),
             )
-            label = "اضغط لعرض الكلمة"
-            action = open_card
-        else:
-            card = ft.Container(
+
+        def face_up():
+            return ft.Container(
+                width=320,
                 height=220,
                 alignment=ft.Alignment.CENTER,
                 content=ft.Container(
                     content=ft.Text(
                         "أنت برا السالفة" if is_spy else g.word,
                         size=40,
-                        weight=ft.FontWeight.BOLD,
+                        font_family="Tajawal Bold",
                         text_align=ft.TextAlign.CENTER,
                         color=ft.Colors.RED if is_spy else ft.Colors.WHITE,
                     ),
@@ -268,12 +291,39 @@ def main(page: ft.Page):
                     border_radius=20,
                 ),
             )
-            label = "إخفاء وتمرير"
-            action = next_player
+
+        card = ft.AnimatedSwitcher(
+            content=face_up() if S["shown"] else face_down(),
+            width=320,
+            height=220,
+            duration=220,
+            transition=ft.AnimatedSwitcherTransition.SCALE,
+            switch_in_curve=ft.AnimationCurve.EASE_OUT,
+        )
+        button = ft.FilledButton(
+            "إخفاء وتمرير" if S["shown"] else "اضغط لعرض الكلمة",
+            height=80,
+            width=320,
+            on_click=lambda e: tap(),
+        )
+
+        def tap():
+            """First tap shows the word, the second hides it and passes on."""
+            if S["shown"]:
+                S["i"] += 1
+                S["shown"] = False
+                reveal()
+                return
+
+            S["shown"] = True
+            card.content = face_up()
+            button.content = "إخفاء وتمرير"
+            buzz()
+            page.update()
 
         show(
             card,
-            ft.FilledButton(label, height=80, width=320, on_click=lambda e: action()),
+            button,
             ft.Container(height=12),
             ft.Container(
                 height=24,
@@ -285,15 +335,6 @@ def main(page: ft.Page):
             center=True,
         )
 
-    def open_card():
-        S["shown"] = True
-        reveal()
-
-    def next_player():
-        S["i"] += 1
-        S["shown"] = False
-        reveal()
-
     # ------------------------------------------------------------ round
 
     def round_screen():
@@ -304,7 +345,7 @@ def main(page: ft.Page):
         asker, answerer = g.last_pair
 
         show(
-            ft.Text(asker, size=44, weight=ft.FontWeight.BOLD),
+            ft.Text(asker, size=44, font_family="Tajawal Bold"),
             ft.Text(f"يسأل: {answerer}", size=20, color=ft.Colors.GREY),
             ft.Container(height=8),
             ft.Text("الإجابة بنعم أو لا فقط", color=ft.Colors.GREY),
@@ -381,9 +422,9 @@ def main(page: ft.Page):
             vote_screen()
 
         show(
-            ft.Text("التصويت", size=30, weight=ft.FontWeight.BOLD),
+            ft.Text("التصويت", size=30, font_family="Tajawal Bold"),
             ft.Text("أعطِ الجوال إلى", color=ft.Colors.GREY),
-            ft.Text(voter, size=30, weight=ft.FontWeight.BOLD),
+            ft.Text(voter, size=30, font_family="Tajawal Bold"),
             ft.Text("من تظنه برا السالفة؟", color=ft.Colors.GREY),
             ft.Container(height=10),
             *[
@@ -431,7 +472,7 @@ def main(page: ft.Page):
             )
 
             show(
-                ft.Text("انتهى التصويت", size=26, weight=ft.FontWeight.BOLD),
+                ft.Text("انتهى التصويت", size=26, font_family="Tajawal Bold"),
                 ft.Text(f"برا السالفة: {g.spy}", size=30, color=ft.Colors.PURPLE_200),
                 ft.Container(height=10),
                 ft.Text("سلّم الجوال إلى الجاسوس واختر الكلمة", color=ft.Colors.AMBER),
@@ -449,7 +490,7 @@ def main(page: ft.Page):
                     color=ft.Colors.AMBER if summary["spy_guessed"] else ft.Colors.GREY,
                 ),
                 ft.Divider(),
-                ft.Text("النقاط", size=22, weight=ft.FontWeight.BOLD),
+                ft.Text("النقاط", size=22, font_family="Tajawal Bold"),
                 *[ft.Text(f"{name} — {points}", size=20) for name, points in board],
                 ft.Container(height=20),
                 ft.FilledButton(
@@ -499,7 +540,7 @@ def main(page: ft.Page):
 
         draw()
         show(
-            ft.Text("الإعدادات", size=30, weight=ft.FontWeight.BOLD),
+            ft.Text("الإعدادات", size=30, font_family="Tajawal Bold"),
             ft.Text(
                 "اكتب عنوان الحاسب الذي يطبعه برنامج server.py",
                 size=14,

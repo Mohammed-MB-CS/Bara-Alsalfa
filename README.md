@@ -3,9 +3,9 @@
 A party spy game on one phone. Word lists are updated from your PC over Wi-Fi,
 and the app keeps working offline from its saved copy.
 
-**Current state: Stages 1–4** — PC server, phone sync, game rules with tests, and
-all six game screens. A full game is playable on desktop right now. Stage 5 adds
-the Arabic font and polish; Stage 6 builds the APK.
+**Current state: Stages 1–5** — PC server, phone sync, game rules with tests,
+all six game screens, and the Arabic font with the animated word reveal. A full
+game is playable on desktop right now. Stage 6 builds the APK.
 
 ## Run it
 
@@ -34,5 +34,6 @@ The server prints the address to type in the app, e.g. `192.168.1.5:8000`.
 | `app.py` | phone: syncs, saves locally, and the six game screens |
 | `game.py` | the rules: spy, word, pairs, scoring — no UI |
 | `test_game.py` | thirteen tests, one per rule |
+| `assets/fonts/` | Tajawal, the Arabic font the app draws with |
 | `local_words.json` | created by the app — the copy kept on the phone |
 | `pc_address.txt` | created by the app — the last PC address |

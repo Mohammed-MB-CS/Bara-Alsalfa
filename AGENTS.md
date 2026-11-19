@@ -26,19 +26,20 @@ stage plan. Each note explains one code file end to end.
 remote. They exist in a working copy only. Do not add them to git, and do not
 treat their absence in a fresh clone as something missing.
 
-## Current state: Stage 4 is done
+## Current state: Stage 5 is done
 
-Stages 1–4 are complete and tested by playing:
+Stages 1–5 are complete and tested by playing:
 
 1. PC server that serves the word list.
 2. Phone-side sync plus an offline saved copy.
 3. Game rules in `game.py`, covered by tests.
 4. All six screens, including settings — one full game is playable on desktop.
+5. Bundled Tajawal font, a scaled reveal animation, vibration on the reveal.
 
 Remaining work:
 
-- **Stage 5** — Arabic web font (Cairo/Tajawal), reveal animation, vibration.
 - **Stage 6** — build the Android APK and run it on a real phone over Wi-Fi.
+  Vibration can only be felt there.
 - **Stage 7** — optional PC editor, local network discovery, cloud sync.
 
 Ask the user which of these to start; do not assume.
