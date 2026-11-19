@@ -4,17 +4,10 @@ Stage 5: the screens, the Arabic font, the reveal animation, vibration.
 Run with:  python app.py
 """
 
-import json
-import pathlib
-
 import flet as ft
-import httpx
 
-from game import Game, choose_category
-
-HERE = pathlib.Path(__file__).parent
-WORDS_FILE = HERE / "local_words.json"  # the copy the phone keeps
-ADDRESS_FILE = HERE / "pc_address.txt"  # last PC address the user typed
+import words
+from game import Game, choose_category, parse_players
 
 
 # ---------------------------------------------------------------- style
@@ -32,53 +25,6 @@ ON_CORAL = "#23120E"  # text on coral
 ON_SAFFRON = "#231C08"  # text on saffron
 ON_SPY = "#F6E9E4"  # text on the spy card
 EDGE = "#1D4A57"  # hairlines: borders and dividers
-
-
-# ---------------------------------------------------------------- files
-
-
-def load_words():
-    if WORDS_FILE.exists():
-        return json.loads(WORDS_FILE.read_text(encoding="utf-8"))
-    return None
-
-
-def save_words(data):
-    WORDS_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-
-
-def load_address():
-    if ADDRESS_FILE.exists():
-        return ADDRESS_FILE.read_text(encoding="utf-8").strip()
-    return ""
-
-
-def save_address(address):
-    ADDRESS_FILE.write_text(address, encoding="utf-8")
-
-
-# ---------------------------------------------------------------- sync
-
-
-def sync_words(address):
-    """Ask the PC for the newest list. Returns (ok, message)."""
-    base = "http://" + address.strip().rstrip("/").removeprefix("http://")
-    try:
-        remote = httpx.get(f"{base}/version", timeout=5).json()["version"]
-        local = load_words()
-
-        if local and local.get("version") == remote:
-            message = f"الكلمات محدثة (نسخة {remote})"
-        else:
-            save_words(httpx.get(f"{base}/data", timeout=10).json())
-            message = f"تم تنزيل نسخة {remote}"
-
-        save_address(base)
-        return True, message
-    except Exception:
-        return False, "تعذر الاتصال بالحاسب"
 
 
 # ---------------------------------------------------------------- screens
@@ -159,8 +105,9 @@ def main(page: ft.Page):
     S = {
         "game": None,  # the Game object, once a game starts
         "names": "",  # last names typed, to prefill next time
-        "i": 0,  # reveal / vote progress
+        "reveal": 0,  # whose card is on screen
         "shown": False,  # reveal: is the card open?
+        "voter": 0,  # whose turn it is to vote
         "votes": {},  # voter -> accused
         "summary": None,  # result of game.finish()
         "words": [],  # the words of the chosen category, for the spy's pick
@@ -193,31 +140,25 @@ def main(page: ft.Page):
     # ------------------------------------------------------------ home
 
     def home():
-        data = load_words()
-        count = len(data["categories"]) if data else 0
+        cats = words.load()
 
         # one line that holds either the count or the sync result,
         # so the buttons above it never move
         status = ft.Text(
-            f"عدد الفئات: {count}" if count else "لا توجد كلمات بعد",
+            f"عدد الفئات: {len(cats)}" if cats else "لا توجد كلمات بعد",
             color=MUTED,
             size=13,
         )
 
         def refresh(e):
-            address = load_address()
-            if not address:
-                status.value = "أدخل عنوان الحاسب من الإعدادات"
-                status.color = SAFFRON
-                page.update()
-                return
-
             status.value = "جاري التحديث..."
             status.color = MUTED
             page.update()
 
-            ok, message = sync_words(address)
-            status.value = message
+            # the address check, the download, the fallback and the message
+            # are all words.sync's business; this only draws what comes back
+            found, message, ok = words.sync(words.saved_address())
+            status.value = f"{message} — عدد الفئات: {len(found)}" if ok else message
             status.color = MINT if ok else CORAL
             page.update()
 
@@ -236,8 +177,8 @@ def main(page: ft.Page):
     # ------------------------------------------------------------ setup
 
     def setup():
-        data = load_words()
-        if not data:
+        cats = words.load()
+        if not cats:
             show(
                 title("لا توجد كلمات محفوظة"),
                 ft.Text("شغّل برنامج الحاسب ثم اضغط تحديث الكلمات", color=MUTED, size=14),
@@ -275,34 +216,30 @@ def main(page: ft.Page):
             value="عشوائي",
             width=300,
             options=[ft.DropdownOption(key="عشوائي", text="عشوائي")]
-            + [ft.DropdownOption(key=c["name"], text=c["name"]) for c in data["categories"]],
+            + [ft.DropdownOption(key=cat.name, text=cat.name) for cat in cats],
             **field,
         )
         error = ft.Text("", color=CORAL, size=13)
 
         def start(e):
-            players = [line.strip() for line in names.value.splitlines() if line.strip()]
-
-            if len(players) < 3:
-                error.value = "تحتاج 3 لاعبين على الأقل"
+            # The screen does not decide who may play: it asks Game and draws
+            # the refusal. Splitting the lines is all the typing it knows.
+            try:
+                chosen = choose_category(
+                    cats, None if category.value == "عشوائي" else category.value
+                )
+                S["game"] = Game(parse_players(names.value), chosen.words)
+            except ValueError as problem:
+                error.value = str(problem)
                 page.update()
                 return
-            if len(set(players)) != len(players):
-                error.value = "لا تكرر نفس الاسم مرتين"
-                page.update()
-                return
 
-            words = choose_category(
-                data, None if category.value == "عشوائي" else category.value
-            )["words"]
-
-            S["game"] = Game(players, words)
             S["names"] = names.value
-            S["i"] = 0
+            S["reveal"] = 0
             S["shown"] = False
             S["votes"] = {}
             S["summary"] = None
-            S["words"] = words
+            S["words"] = chosen.words
             reveal()
 
         show(
@@ -323,12 +260,12 @@ def main(page: ft.Page):
 
     def reveal():
         g = S["game"]
-        if S["i"] >= len(g.players):
+        cards = g.reveal()
+        if S["reveal"] >= len(cards):
             round_screen()
             return
 
-        name = g.players[S["i"]]
-        is_spy = name == g.spy
+        name, text, is_spy = cards[S["reveal"]]
 
         # Two faces of one card, same size, swapped inside an AnimatedSwitcher:
         # the word appears with a small pop, and the button under the card
@@ -358,7 +295,7 @@ def main(page: ft.Page):
                 height=220,
                 alignment=ft.Alignment.CENTER,
                 content=ft.Text(
-                    "أنت برا\nالسالفة" if is_spy else g.word,
+                    text,
                     size=40 if is_spy else 46,
                     font_family="Tajawal Bold",
                     text_align=ft.TextAlign.CENTER,
@@ -387,7 +324,7 @@ def main(page: ft.Page):
         def tap():
             """First tap shows the word, the second hides it and passes on."""
             if S["shown"]:
-                S["i"] += 1
+                S["reveal"] += 1
                 S["shown"] = False
                 reveal()
                 return
@@ -407,7 +344,7 @@ def main(page: ft.Page):
                 height=24,
                 alignment=ft.Alignment.CENTER,
                 content=ft.Text(
-                    f"{S['i'] + 1} من {len(g.players)}", color=MUTED, size=13
+                    f"{S['reveal'] + 1} من {len(g.players)}", color=MUTED, size=13
                 ),
             ),
             center=True,
@@ -465,39 +402,40 @@ def main(page: ft.Page):
         )
 
     def next_round():
-        S["game"].next_pair()
-        # round 10 ends the questions whether anybody asked or not
-        if S["game"].should_vote():
-            start_vote()
+        # advance() answers "a pair to ask about, or the questions are over"
+        if S["game"].advance() is None:
+            vote_now()
         else:
             round_screen()
 
     def ask_vote():
-        S["game"].request_vote()
-        if S["game"].should_vote():
-            start_vote()
+        g = S["game"]
+        g.request_vote()
+        if g.should_vote():
+            vote_now()
         else:
             round_screen()
 
     # ------------------------------------------------------------ vote
 
-    def start_vote():
+    def vote_now():
+        """Voting begins: the requests that earned it are used up."""
         S["game"].start_vote()
-        S["i"] = 0
+        S["voter"] = 0
         S["votes"] = {}
         vote_screen()
 
     def vote_screen():
         g = S["game"]
-        if S["i"] >= len(g.players):
+        if S["voter"] >= len(g.players):
             result_screen()
             return
 
-        voter = g.players[S["i"]]
+        voter = g.players[S["voter"]]
 
         def pick(accused):
             S["votes"][voter] = accused
-            S["i"] += 1
+            S["voter"] += 1
             vote_screen()
 
         show(
@@ -522,15 +460,27 @@ def main(page: ft.Page):
                         text_style=ft.TextStyle(size=17, font_family="Tajawal Bold"),
                     ),
                 )
-                for name in g.players
-                if name != voter
+                for name in g.choices_for(voter)
             ],
             ft.Container(height=12),
-            ft.Text(f"{S['i'] + 1} من {len(g.players)}", color=MUTED, size=13),
+            ft.Text(f"{S['voter'] + 1} من {len(g.players)}", color=MUTED, size=13),
             center=True,
         )
 
     # ------------------------------------------------------------ result
+
+    def play_again(e):
+        """Another round: same players, same category, scores kept.
+
+        The setup screen is deliberately skipped. It is where a new match
+        begins, and a new match is what resets the scores.
+        """
+        S["game"].start_again()
+        S["reveal"] = 0
+        S["shown"] = False
+        S["votes"] = {}
+        S["summary"] = None
+        reveal()
 
     def result_screen():
         g = S["game"]
@@ -628,7 +578,7 @@ def main(page: ft.Page):
                     for name, points in board
                 ],
                 ft.Container(height=24),
-                action("العب مرة أخرى", lambda e: setup()),
+                action("العب مرة أخرى", play_again),
                 quiet("الرئيسية", lambda e: home()),
                 center=True,
             )
@@ -640,7 +590,7 @@ def main(page: ft.Page):
         cats = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO, expand=True)
         address = ft.TextField(
             hint_text="192.168.1.5:8000",
-            value=load_address(),
+            value=words.saved_address(),
             expand=True,
             text_size=16,
             filled=True,
@@ -656,12 +606,12 @@ def main(page: ft.Page):
 
         def draw():
             cats.controls.clear()
-            data = load_words()
-            if not data:
+            saved = words.load()
+            if not saved:
                 cats.controls.append(ft.Text("لا توجد كلمات محفوظة", color=MUTED, size=14))
                 return
-            for cat in data["categories"]:
-                n = len(cat["words"])
+            for cat in saved:
+                n = len(cat.words)
                 # Arabic counts change the word: 3-10 takes the plural
                 if n == 1:
                     count = "كلمة واحدة"
@@ -673,7 +623,7 @@ def main(page: ft.Page):
                     count = f"{n} كلمة"
                 cats.controls.append(
                     ft.Text(
-                        f"{cat['name']} — {count}",
+                        f"{cat.name} — {count}",
                         size=15,
                         color=TEXT,
                     )
@@ -684,7 +634,8 @@ def main(page: ft.Page):
             status.color = MUTED
             page.update()
 
-            ok, message = sync_words(address.value)
+            # the same call home makes; only the screen around it differs
+            _, message, ok = words.sync(address.value)
             status.value = message
             status.color = MINT if ok else CORAL
             draw()

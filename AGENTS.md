@@ -70,7 +70,7 @@ not to add a browser-driven test.
 cd C:\work\bara_alsalfa
 .\.venv\Scripts\python.exe server.py      # PC side; prints its LAN address
 .\.venv\Scripts\python.exe app.py         # the game
-.\.venv\Scripts\python.exe test_game.py   # 13 rule tests, must end "all tests passed"
+.\.venv\Scripts\python.exe test_game.py   # 22 rule tests, must end "all tests passed"
 ```
 
 Dependencies are pinned in `requirements.txt`; the virtual environment is
@@ -85,3 +85,17 @@ Dependencies are pinned in `requirements.txt`; the virtual environment is
   resized. Reloading the page fixes it; it is not an app bug.
 - When testing the UI headlessly, the Flet Python session survives a page reload,
   so code changes need a server restart.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as markdown files under `.scratch/<feature-slug>/`, not on GitHub. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default labels, each named after its role: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` at the repo root plus `docs/adr/`. See `docs/agents/domain.md`.
