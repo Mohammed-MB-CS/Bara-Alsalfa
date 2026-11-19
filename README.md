@@ -33,6 +33,6 @@ The server prints the address to type in the app, e.g. `192.168.1.5:8000`.
 | `words.json` | your categories and words (bump `version` when you edit) |
 | `app.py` | phone: syncs, saves locally, and the six game screens |
 | `game.py` | the rules: spy, word, pairs, scoring — no UI |
-| `test_game.py` | seven tests, one per rule |
+| `test_game.py` | thirteen tests, one per rule |
 | `local_words.json` | created by the app — the copy kept on the phone |
 | `pc_address.txt` | created by the app — the last PC address |

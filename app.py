@@ -79,7 +79,6 @@ def main(page: ft.Page):
         "names": "",  # last names typed, to prefill next time
         "i": 0,  # reveal / vote progress
         "shown": False,  # reveal: is the card open?
-        "wanted": 0,  # how many players asked to vote this round
         "votes": {},  # voter -> accused
         "summary": None,  # result of game.finish()
         "words": [],  # the words of the chosen category, for the spy's pick
@@ -210,7 +209,6 @@ def main(page: ft.Page):
             S["names"] = names.value
             S["i"] = 0
             S["shown"] = False
-            S["wanted"] = 0
             S["votes"] = {}
             S["summary"] = None
             S["words"] = words
@@ -329,7 +327,7 @@ def main(page: ft.Page):
                 height=22,
                 alignment=ft.Alignment.CENTER,
                 content=ft.Text(
-                    f"طلبات التصويت: {S['wanted']} من {len(g.players) // 2 + 1}",
+                    f"طلبات التصويت: {g.vote_requests} من {g.votes_needed()}",
                     color=ft.Colors.GREY,
                 ),
             ),
@@ -349,14 +347,14 @@ def main(page: ft.Page):
     def next_round():
         S["game"].next_pair()
         # round 10 ends the questions whether anybody asked or not
-        if S["game"].should_vote(S["wanted"]):
+        if S["game"].should_vote():
             start_vote()
         else:
             round_screen()
 
     def ask_vote():
-        S["wanted"] += 1
-        if S["game"].should_vote(S["wanted"]):
+        S["game"].request_vote()
+        if S["game"].should_vote():
             start_vote()
         else:
             round_screen()
@@ -364,9 +362,9 @@ def main(page: ft.Page):
     # ------------------------------------------------------------ vote
 
     def start_vote():
+        S["game"].start_vote()
         S["i"] = 0
         S["votes"] = {}
-        S["wanted"] = 0
         vote_screen()
 
     def vote_screen():

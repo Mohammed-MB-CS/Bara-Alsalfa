@@ -40,8 +40,6 @@ Remaining work:
 - **Stage 5** — Arabic web font (Cairo/Tajawal), reveal animation, vibration.
 - **Stage 6** — build the Android APK and run it on a real phone over Wi-Fi.
 - **Stage 7** — optional PC editor, local network discovery, cloud sync.
-- **One open item from the spec** — move the vote-request counter into `Game`
-  so its bug becomes testable (see below).
 
 Ask the user which of these to start; do not assume.
 
@@ -50,11 +48,9 @@ Ask the user which of these to start; do not assume.
 `specs/stage-4-game-screens.md` describes work that is **already implemented**.
 Its problem statement lists six bugs (backwards round screen, impossible round
 number, typed spy guess, lost vote requests, moving buttons, sync leaving the
-home screen) — all six are fixed in the current code.
-
-The only genuinely unfinished item in it is moving the vote-request counter out
-of the screen state and into `Game`, plus the six tests listed in its Testing
-Decisions section. Do not re-implement the rest.
+home screen) — all six are fixed in the current code, and its last open item
+(the vote-request counter, plus its six tests) is done too. Do not re-implement
+any of it.
 
 ## One test seam
 
@@ -73,7 +69,7 @@ not to add a browser-driven test.
 cd C:\work\bara_alsalfa
 .\.venv\Scripts\python.exe server.py      # PC side; prints its LAN address
 .\.venv\Scripts\python.exe app.py         # the game
-.\.venv\Scripts\python.exe test_game.py   # 7 rule tests, must end "all tests passed"
+.\.venv\Scripts\python.exe test_game.py   # 13 rule tests, must end "all tests passed"
 ```
 
 Dependencies are pinned in `requirements.txt`; the virtual environment is

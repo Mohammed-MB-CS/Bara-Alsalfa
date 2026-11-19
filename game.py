@@ -30,6 +30,7 @@ class Game:
         self.round = 0
         self.last_pair = None
         self.played = set()  # everybody who has asked or answered at least once
+        self.vote_requests = 0  # presses of "we want to vote", kept across rounds
         self.scores = {name: 0 for name in self.players}
 
     def next_pair(self):
@@ -65,16 +66,25 @@ class Game:
     def everyone_played(self):
         return len(self.played) == len(self.players)
 
-    def majority_wants_vote(self, wanted):
-        """True when more than half the players pressed 'go to vote'."""
-        return wanted > len(self.players) / 2
+    def votes_needed(self):
+        """How many requests make a majority."""
+        return len(self.players) // 2 + 1
 
-    def should_vote(self, wanted=0):
+    def request_vote(self):
+        """One player pressed 'we want to vote'."""
+        self.vote_requests += 1
+
+    def should_vote(self):
         """Voting starts when everybody has played, and round 10 or the
-        majority asks for it."""
+        majority asked for it. Requests are not per round, so one made in
+        round 3 still counts in round 7."""
         if not self.everyone_played():
             return False
-        return self.round >= 10 or self.majority_wants_vote(wanted)
+        return self.round >= 10 or self.vote_requests >= self.votes_needed()
+
+    def start_vote(self):
+        """Voting begins, so the requests that caused it are used up."""
+        self.vote_requests = 0
 
     def finish(self, votes, guess=None):
         """Apply the rules and return what happened.

@@ -88,11 +88,80 @@ def test_end_condition():
     g.played.add("D")
     assert g.should_vote() is True, "round 10 with everybody played"
 
-    h = Game(["A", "B", "C", "D"], ["كبسة"])
-    h.played = {"A", "B", "C", "D"}
-    assert h.should_vote(0) is False, "round 0, nobody asked"
-    assert h.should_vote(2) is False, "2 of 4 is not a majority"
-    assert h.should_vote(3) is True, "3 of 4 is a majority"
+
+def test_requests_survive_round():
+    # A request made before a round still counts after it.
+    g = Game(["A", "B", "C", "D"], ["كبسة"])
+    g.played = set(g.players)  # forced: everybody has played
+    g.request_vote()
+    g.request_vote()
+    g.next_pair()
+
+    assert g.should_vote() is False, "2 of 4 is not a majority"
+    g.request_vote()
+    assert g.should_vote() is True, "the two older requests plus this one"
+
+
+def test_request_ignored_until_everyone_played():
+    # Pressing does not start a vote while somebody has not played, but the
+    # press is not thrown away either.
+    g = Game(["A", "B", "C", "D"], ["كبسة"])
+    g.played = {"A", "B", "C"}  # forced: D has not played
+    for _ in range(3):
+        g.request_vote()
+
+    assert g.should_vote() is False, "somebody has not played"
+
+    g.played.add("D")
+    assert g.should_vote() is True, "the same three requests now count"
+
+
+def test_ten_rounds():
+    # Round 10 ends the questions with zero requests.
+    g = Game(["A", "B", "C", "D"], ["كبسة"])
+    g.played = set(g.players)
+
+    g.round = 9
+    assert g.should_vote() is False
+    g.round = 10
+    assert g.should_vote() is True
+
+
+def test_majority():
+    # Exactly half is not a majority; one more is.
+    g = Game(["A", "B", "C", "D"], ["كبسة"])
+    g.played = set(g.players)
+    assert g.votes_needed() == 3
+
+    g.request_vote()
+    g.request_vote()
+    assert g.should_vote() is False, "2 of 4 is exactly half"
+
+    g.request_vote()
+    assert g.should_vote() is True, "3 of 4 is a majority"
+
+
+def test_vote_clears_requests():
+    g = Game(["A", "B", "C", "D"], ["كبسة"])
+    g.played = set(g.players)
+    for _ in range(3):
+        g.request_vote()
+    assert g.should_vote() is True
+
+    g.start_vote()
+    assert g.vote_requests == 0, "the requests that started the vote are used up"
+    assert g.should_vote() is False, "the next round starts with no requests"
+
+
+def test_spy_guess_is_exact():
+    # Only the exact word from the list scores. "لم يعرف" arrives as None.
+    for guess, expected in ((None, 0), ("مندي", 0), ("كبسة", 2)):
+        g = Game(["A", "B", "C"], ["كبسة"])
+        g.spy = "A"
+        g.finish({"B": "A", "C": "B"}, guess=guess)
+
+        assert g.scores["A"] == expected, "spy points"
+        assert g.scores["B"] == 1, "voters keep their point either way"
 
 
 def test_category():
@@ -112,10 +181,16 @@ if __name__ == "__main__":
     tests = [
         test_scoring,
         test_spy_points,
+        test_spy_guess_is_exact,
         test_pair_rule,
         test_min_players,
         test_everyone_played,
         test_end_condition,
+        test_requests_survive_round,
+        test_request_ignored_until_everyone_played,
+        test_ten_rounds,
+        test_majority,
+        test_vote_clears_requests,
         test_category,
     ]
     for test in tests:
