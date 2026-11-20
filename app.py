@@ -110,29 +110,66 @@ def main(page: ft.Page):
         "voter": 0,  # whose turn it is to vote
         "votes": {},  # voter -> accused
         "summary": None,  # result of game.finish()
-        "words": [],  # the words of the chosen category, for the spy's pick
     }
 
     def show(*controls, center=False):
-        """One screen = one scrollable column.
+        """One screen = one opaque card over the word wall.
 
         Without the scroll, a long word list on a small phone is clipped at the
-        bottom edge and cannot be reached.
+        bottom edge and cannot be reached. The wall, its scrim and the card
+        live here, so one change dresses every screen.
         """
         page.controls.clear()
         page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
         page.vertical_alignment = ft.MainAxisAlignment.START
         page.add(
-            ft.Column(
-                list(controls),
+            ft.Stack(
+                [
+                    # The 100-word wall, cropped to fill any screen. Painted as
+                    # a container decoration rather than an Image child: an
+                    # Image keeps its aspect and stops short of the bottom.
+                    ft.Container(
+                        expand=True,
+                        image=ft.DecorationImage(
+                            src="/word-background.png",
+                            fit=ft.BoxFit.COVER,
+                        ),
+                    ),
+                    # A light touch of the ground over the words: enough that
+                    # captions stay readable, not so much that the wall fades.
+                    # The prototype showed these words at full strength and
+                    # that is what was approved, so this stays shallow.
+                    ft.Container(
+                        expand=True,
+                        bgcolor=ft.Colors.with_opacity(0.3, INK),
+                    ),
+                    # An opaque card, only as big as the content it carries.
+                    # The wall stays outside it; nothing shows through to sit
+                    # under the text as the phone is passed around.
+                    ft.Container(
+                        expand=True,
+                        alignment=ft.Alignment.TOP_CENTER,
+                        content=ft.Container(
+                            width=340,
+                            max_height=(page.height or 820) - 80,
+                            padding=ft.Padding(16, 16, 16, 16),
+                            bgcolor=INK,
+                            border_radius=18,
+                            border=ft.Border.all(1, EDGE),
+                            content=ft.Column(
+                                list(controls),
+                                scroll=ft.ScrollMode.AUTO,
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                alignment=(
+                                    ft.MainAxisAlignment.CENTER
+                                    if center
+                                    else ft.MainAxisAlignment.START
+                                ),
+                            ),
+                        ),
+                    ),
+                ],
                 expand=True,
-                scroll=ft.ScrollMode.AUTO,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                alignment=(
-                    ft.MainAxisAlignment.CENTER
-                    if center
-                    else ft.MainAxisAlignment.START
-                ),
             )
         )
         page.update()
@@ -239,7 +276,6 @@ def main(page: ft.Page):
             S["shown"] = False
             S["votes"] = {}
             S["summary"] = None
-            S["words"] = chosen.words
             reveal()
 
         show(
@@ -509,7 +545,7 @@ def main(page: ft.Page):
                             text_style=ft.TextStyle(size=17, font_family="Tajawal Bold"),
                         ),
                     )
-                    for word in S["words"]
+                    for word in g.words
                 ]
                 + [
                     ft.Container(height=6),
@@ -604,9 +640,12 @@ def main(page: ft.Page):
             cursor_color=MINT,
         )
 
-        def draw():
+        def draw(saved=None):
+            # A sync already brings the categories back; only a fresh screen
+            # needs to read the file.
+            if saved is None:
+                saved = words.load()
             cats.controls.clear()
-            saved = words.load()
             if not saved:
                 cats.controls.append(ft.Text("لا توجد كلمات محفوظة", color=MUTED, size=14))
                 return
@@ -635,10 +674,10 @@ def main(page: ft.Page):
             page.update()
 
             # the same call home makes; only the screen around it differs
-            _, message, ok = words.sync(address.value)
+            found, message, ok = words.sync(address.value)
             status.value = message
             status.color = MINT if ok else CORAL
-            draw()
+            draw(found)
             page.update()
 
         draw()
