@@ -180,8 +180,6 @@ class Game:
         self.finished = True
 
         return {
-            "spy": self.spy,
             "word": self.word,
             "spy_guessed": spy_guessed,
-            "correct_voters": [v for v, a in votes.items() if a == self.spy],
         }

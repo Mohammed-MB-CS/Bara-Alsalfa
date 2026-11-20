@@ -17,6 +17,19 @@ SAVED = HERE / "local_words.json"  # the copy the phone keeps
 ADDRESS = HERE / "pc_address.txt"  # last PC address the user typed
 
 
+def use_storage(directory):
+    """Keep the two files in a writable folder.
+
+    On desktop that is already HERE, next to this file. In the APK the app is
+    packed into a read-only archive, so app.py passes Flet's data directory
+    before the first load. Both files are made only of what the phone received,
+    so a fresh install starting empty is correct.
+    """
+    global SAVED, ADDRESS
+    SAVED = pathlib.Path(directory) / "local_words.json"
+    ADDRESS = pathlib.Path(directory) / "pc_address.txt"
+
+
 def _saved():
     """The saved document exactly as it is on disk, or None."""
     try:

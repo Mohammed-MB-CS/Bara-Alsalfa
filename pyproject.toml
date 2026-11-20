@@ -1,0 +1,55 @@
+# What `flet build apk` reads before it starts.
+#
+# [project] is the standard Python table: the app's name and the libraries the
+# APK needs. It deliberately does NOT list fastapi and uvicorn — those belong to
+# server.py, which runs on the PC and is not shipped to the phone.
+[project]
+name = "bara-alsalfa"
+version = "1.0.0"
+description = "برا السالفة — a party spy game passed around one phone"
+requires-python = ">=3.13"
+dependencies = [
+    "flet==1.1.2",
+    "httpx==0.28.1",
+]
+
+[tool.flet]
+# Shown under the launcher icon and on the app switcher.
+product = "برا السالفة"
+# The APK's file name. ASCII so the terminal and adb never wrestle with it.
+artifact = "bara-alsalfa"
+org = "com.mohammed"
+bundle_id = "com.mohammed.baraalsalfa"
+build_number = 1
+
+# The launcher entry point is app.py, not Flet's default main.py.
+[tool.flet.app]
+module = "app"
+# Only the app ships. The rest is PC-side, study material, or machine state.
+exclude = [
+    "notes",
+    "specs",
+    ".scratch",
+    "docs",
+    ".vscode",
+    "build",
+    "dist",
+    "server.py",
+    "words.json",
+    "test_game.py",
+    "README.md",
+    "AGENTS.md",
+    "local_words.json",
+    "pc_address.txt",
+]
+
+# The screen before the first frame: the same ground the app uses, so opening
+# it does not flash white in a dark room.
+[tool.flet.splash]
+color = "#0B1B22"
+dark_color = "#0B1B22"
+
+[tool.flet.android.manifest_application]
+# The PC server speaks plain http:// on the home Wi-Fi, and Android 9+ refuses
+# cleartext by default. This is the one line that lets a release APK talk to it.
+usesCleartextTraffic = true

@@ -4,6 +4,8 @@ Stage 5: the screens, the Arabic font, the reveal animation, vibration.
 Run with:  python app.py
 """
 
+import os
+
 import flet as ft
 
 import words
@@ -35,6 +37,13 @@ def main(page: ft.Page):
     page.rtl = True
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 20
+
+    # On a phone the program is packed into a read-only archive, so the saved
+    # words cannot live next to app.py. Flet creates a private data folder and
+    # names it in this variable; on desktop the variable is absent and the files
+    # stay in the project, where you can open them.
+    if page.platform in (ft.PagePlatform.ANDROID, ft.PagePlatform.IOS):
+        words.use_storage(os.environ.get("FLET_APP_STORAGE_DATA", "."))
 
     # The font ships inside the app, in assets/fonts/. Tajawal because it is a
     # static font: Flet cannot load variable fonts yet.
@@ -113,11 +122,11 @@ def main(page: ft.Page):
     }
 
     def show(*controls, center=False):
-        """One screen = one opaque card over the word wall.
+        """One screen = one scrollable column over the word wall.
 
         Without the scroll, a long word list on a small phone is clipped at the
-        bottom edge and cannot be reached. The wall, its scrim and the card
-        live here, so one change dresses every screen.
+        bottom edge and cannot be reached. The wall and its scrim live here, so
+        one change dresses every screen.
         """
         page.controls.clear()
         page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
@@ -143,29 +152,17 @@ def main(page: ft.Page):
                         expand=True,
                         bgcolor=ft.Colors.with_opacity(0.3, INK),
                     ),
-                    # An opaque card, only as big as the content it carries.
-                    # The wall stays outside it; nothing shows through to sit
-                    # under the text as the phone is passed around.
-                    ft.Container(
+                    # The content sits straight on the wall. The image itself
+                    # keeps its words clear of this area, so no card is needed.
+                    ft.Column(
+                        list(controls),
                         expand=True,
-                        alignment=ft.Alignment.TOP_CENTER,
-                        content=ft.Container(
-                            width=340,
-                            max_height=(page.height or 820) - 80,
-                            padding=ft.Padding(16, 16, 16, 16),
-                            bgcolor=INK,
-                            border_radius=18,
-                            border=ft.Border.all(1, EDGE),
-                            content=ft.Column(
-                                list(controls),
-                                scroll=ft.ScrollMode.AUTO,
-                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                                alignment=(
-                                    ft.MainAxisAlignment.CENTER
-                                    if center
-                                    else ft.MainAxisAlignment.START
-                                ),
-                            ),
+                        scroll=ft.ScrollMode.AUTO,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        alignment=(
+                            ft.MainAxisAlignment.CENTER
+                            if center
+                            else ft.MainAxisAlignment.START
                         ),
                     ),
                 ],
@@ -200,8 +197,12 @@ def main(page: ft.Page):
             page.update()
 
         show(
+            # The launcher icon doubles as the home-screen logo: one file to
+            # maintain, and the same mark the player sees on the phone.
+            ft.Image(src="/icon.png", width=84, height=84, fit=ft.BoxFit.CONTAIN),
+            ft.Container(height=14),
             ft.Text("برا السالفة", size=40, font_family="Tajawal Bold", color=TEXT),
-            ft.Text("لعبة الجاسوس", size=14, color=MUTED),
+            # ft.Text("لعبة الجاسوس", size=14, color=MUTED),
             ft.Container(height=36),
             action("لعبة جديدة", lambda e: setup()),
             quiet("تحديث الكلمات", refresh, color=MINT),
